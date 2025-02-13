@@ -1,0 +1,486 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-4">
+    <nav aria-label="breadcrumb">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="{{ url_for('user_dashboard') }}">Dashboard</a></li>
+            <li class="breadcrumb-item">{{ lecture.subject.name }}</li>
+            <li class="breadcrumb-item active">{{ lecture.title }}</li>
+        </ol>
+    </nav>
+
+    <div class="row">
+        <!-- Left Column: Video and Timestamps -->
+        <div class="col-md-8">
+            <div class="card mb-4">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h3 class="mb-0">{{ lecture.title }}</h3>
+                    {% if current_user.is_admin() %}
+                    <div>
+                        <a href="{{ url_for('edit_lecture', lecture_id=lecture.id) }}" class="btn btn-sm btn-primary">
+                            <i class="fas fa-edit"></i> Edit
+                        </a>
+                        <button type="button" class="btn btn-sm btn-danger" data-bs-toggle="modal" data-bs-target="#deleteModal">
+                            <i class="fas fa-trash"></i> Delete
+                        </button>
+                    </div>
+                    {% endif %}
+                </div>
+                <div class="card-body p-0">
+                    {% if lecture.video_url %}
+                    <div class="video-container mb-0">
+                        <div id="player"></div>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            {% if lecture.timestamps %}
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h4 class="mb-0"><i class="fas fa-clock"></i> Video Chapters</h4>
+                </div>
+                <div class="card-body">
+                    <div class="list-group timestamp-list">
+                        {% for timestamp in lecture.timestamps %}
+                        <div class="timestamp-item" onclick="seekVideo({{ timestamp.timestamp }})">
+                            <i class="fas fa-play-circle me-2"></i>
+                            {{ '%02d'|format(timestamp.timestamp//60) }}:{{ '%02d'|format(timestamp.timestamp%60) }} - 
+                            {{ timestamp.title }}
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- Right Column: AI-Generated Content -->
+        <div class="col-md-4">
+            <!-- Summary -->
+            {% if lecture.summary %}
+            <div class="card mb-4">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h4 class="mb-0"><i class="fas fa-file-alt"></i> Summary</h4>
+                    {% if current_user.is_admin() %}
+                    <button class="btn btn-sm btn-outline-primary" onclick="regenerateAIContent('summary')">
+                        <i class="fas fa-sync-alt"></i> Regenerate
+                    </button>
+                    {% endif %}
+                </div>
+                <div class="card-body">
+                    <div class="ai-summary ai-content">
+                        {{ lecture.summary.content|safe }}
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Flashcards -->
+            {% if lecture.flashcards %}
+            <div class="card mb-4">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h4 class="mb-0"><i class="fas fa-clone"></i> Flashcards</h4>
+                    {% if current_user.is_admin() %}
+                    <button class="btn btn-sm btn-outline-primary" onclick="regenerateAIContent('flashcards')">
+                        <i class="fas fa-sync-alt"></i> Regenerate
+                    </button>
+                    {% endif %}
+                </div>
+                <div class="card-body p-0">
+                    <div id="flashcardCarousel" class="carousel slide" data-bs-interval="false">
+                        <div class="carousel-inner">
+                            {% for card in lecture.flashcards %}
+                            <div class="carousel-item {% if loop.first %}active{% endif %}">
+                                <div class="ai-flashcard">
+                                    <div class="flashcard">
+                                        <div class="flashcard-front">
+                                            <div class="flashcard-content ai-content">
+                                                {{ card.front|safe }}
+                                            </div>
+                                            <small class="text-muted mt-2">Click to flip</small>
+                                        </div>
+                                        <div class="flashcard-back">
+                                            <div class="flashcard-content ai-content">
+                                                {{ card.back|safe }}
+                                            </div>
+                                            <small class="text-muted mt-2">Click to flip back</small>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                        {% if lecture.flashcards|length > 1 %}
+                        <button class="carousel-control-prev" type="button" data-bs-target="#flashcardCarousel" data-bs-slide="prev">
+                            <span class="carousel-control-prev-icon"></span>
+                        </button>
+                        <button class="carousel-control-next" type="button" data-bs-target="#flashcardCarousel" data-bs-slide="next">
+                            <span class="carousel-control-next-icon"></span>
+                        </button>
+                        <div class="carousel-indicators">
+                            {% for _ in lecture.flashcards %}
+                            <button type="button" data-bs-target="#flashcardCarousel" data-bs-slide-to="{{ loop.index0 }}" 
+                                    {% if loop.first %}class="active"{% endif %}></button>
+                            {% endfor %}
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Notes -->
+            {% if lecture.notes %}
+            <div class="card mb-4">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h4 class="mb-0"><i class="fas fa-sticky-note"></i> Study Notes</h4>
+                    {% if current_user.is_admin() %}
+                    <button class="btn btn-sm btn-outline-primary" onclick="regenerateAIContent('notes')">
+                        <i class="fas fa-sync-alt"></i> Regenerate
+                    </button>
+                    {% endif %}
+                </div>
+                <div class="card-body">
+                    <div class="ai-notes ai-content">
+                        {{ lecture.notes.content|safe }}
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- AI Quiz Generation (Admin Only) -->
+            {% if current_user.is_admin() %}
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h4 class="mb-0"><i class="fas fa-question-circle"></i> Generate Quiz</h4>
+                </div>
+                <div class="card-body">
+                    <form action="{{ url_for('generate_lecture_quiz', lecture_id=lecture.id) }}" method="POST" class="quiz-form">
+                        <div class="mb-3">
+                            <label for="num_questions" class="form-label">Number of Questions</label>
+                            <div class="input-group">
+                                <input type="number" class="form-control" id="num_questions" name="num_questions" 
+                                       value="10" min="5" max="50">
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="fas fa-robot"></i> Generate AI Quiz
+                                </button>
+                            </div>
+                            <small class="form-text text-muted">Choose between 5 and 50 questions</small>
+                        </div>
+                    </form>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- Delete Confirmation Modal -->
+{% if current_user.is_admin() %}
+<div class="modal fade" id="deleteModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Delete Lecture</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p class="mb-0">Are you sure you want to delete this lecture? This action cannot be undone.</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <form action="{{ url_for('delete_lecture', lecture_id=lecture.id) }}" method="POST" style="display: inline;">
+                    <button type="submit" class="btn btn-danger">
+                        <i class="fas fa-trash"></i> Delete
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<style>
+.video-container {
+    position: relative;
+    padding-bottom: 56.25%;
+    height: 0;
+    overflow: hidden;
+    border-radius: 0.375rem;
+    margin-bottom: 1rem;
+    box-shadow: 0 2px 4px rgba(0,0,0,.1);
+}
+
+.video-container #player {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    border-radius: 0.375rem;
+}
+
+.timestamp-list {
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+.timestamp-item {
+    padding: 8px 12px;
+    cursor: pointer;
+    border-bottom: 1px solid rgba(0,0,0,.125);
+    transition: background-color 0.2s;
+}
+
+.timestamp-item:hover {
+    background-color: rgba(0,0,0,.05);
+}
+
+.flashcard {
+    position: relative;
+    width: 100%;
+    height: 250px;
+    perspective: 1000px;
+    cursor: pointer;
+    transform-style: preserve-3d;
+    transition: transform 0.6s;
+}
+
+.flashcard.flipped {
+    transform: rotateY(180deg);
+}
+
+.flashcard-front, .flashcard-back {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    backface-visibility: hidden;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    padding: 1.5rem;
+    background: white;
+    border-radius: 0.5rem;
+    box-shadow: 0 2px 4px rgba(0,0,0,.1);
+}
+
+.flashcard-content {
+    text-align: center;
+    font-size: 1.1rem;
+    line-height: 1.5;
+    overflow-y: auto;
+    max-height: 180px;
+    width: 100%;
+    padding: 0.5rem;
+}
+
+.flashcard-back {
+    transform: rotateY(180deg);
+}
+
+.notes-content {
+    max-height: 400px;
+    overflow-y: auto;
+    padding-right: 0.5rem;
+}
+
+.carousel-control-prev,
+.carousel-control-next {
+    width: 10%;
+}
+
+.carousel-control-prev-icon,
+.carousel-control-next-icon {
+    background-color: rgba(0,0,0,.3);
+    border-radius: 50%;
+    padding: 1rem;
+}
+
+.quiz-form .btn {
+    transition: all 0.3s ease;
+}
+
+.quiz-form .btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 2px 4px rgba(0,0,0,.2);
+}
+</style>
+
+{% endblock %}
+
+{% block scripts %}
+<script src="https://www.youtube.com/iframe_api"></script>
+<script>
+let player;
+
+function onYouTubeIframeAPIReady() {
+    {% if lecture.video_url %}
+    const videoId = getYouTubeId('{{ lecture.video_url }}');
+    if (videoId) {
+        player = new YT.Player('player', {
+            videoId: videoId,
+            playerVars: {
+                'playsinline': 1,
+                'rel': 0,
+                'modestbranding': 1
+            }
+        });
+    }
+    {% endif %}
+}
+
+function getYouTubeId(url) {
+    const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/;
+    const match = url.match(regExp);
+    return (match && match[2].length === 11) ? match[2] : null;
+}
+
+function seekVideo(seconds) {
+    if (player && typeof player.seekTo === 'function') {
+        player.seekTo(seconds);
+        player.playVideo();
+    }
+}
+
+function regenerateAIContent(type) {
+    if (confirm(`Are you sure you want to regenerate the ${type}?`)) {
+        showToast(`Starting ${type} regeneration...`, 'info');
+        
+        fetch(`/admin/lecture/{{ lecture.id }}/regenerate/${type}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.error) {
+                showToast(`Error: ${data.error}`, 'error');
+            } else {
+                showToast('Content regeneration started', 'success');
+                // Start monitoring progress
+                monitorGenerationProgress({{ lecture.id }});
+            }
+        })
+        .catch(error => {
+            showToast(`Error: ${error.message}`, 'error');
+        });
+    }
+}
+
+function monitorGenerationProgress(lectureId) {
+    const progressContainer = document.getElementById('progressContainer');
+    if (!progressContainer) return;
+
+    progressContainer.style.display = 'block';
+    
+    // Initialize progress bars
+    const components = ['transcript', 'summary', 'flashcards', 'notes', 'quiz'];
+    components.forEach(component => {
+        const progressBar = document.querySelector(`#${component}Progress .progress-bar`);
+        if (progressBar) {
+            progressBar.style.width = '0%';
+            progressBar.textContent = '0%';
+        }
+    });
+
+    const evtSource = new EventSource(`/lecture/${lectureId}/generation-progress`);
+    let errorOccurred = false;
+
+    evtSource.onmessage = function(event) {
+        const data = JSON.parse(event.data);
+        const component = data.component;
+        const progress = data.progress;
+
+        const progressBar = document.querySelector(`#${component}Progress .progress-bar`);
+        if (progressBar) {
+            progressBar.style.width = `${progress}%`;
+            progressBar.textContent = `${progress}%`;
+            
+            if (progress === 100) {
+                progressBar.classList.add('bg-success');
+            }
+        }
+
+        if (component === 'complete') {
+            showToast('Content generation completed successfully!', 'success');
+            setTimeout(() => location.reload(), 2000);
+            evtSource.close();
+        }
+    };
+
+    evtSource.onerror = function(error) {
+        if (!errorOccurred) {  // Prevent multiple error messages
+            errorOccurred = true;
+            showToast('Error in content generation. Please try again.', 'error');
+            evtSource.close();
+            
+            // Reset progress bars to show failure
+            components.forEach(component => {
+                const progressBar = document.querySelector(`#${component}Progress .progress-bar`);
+                if (progressBar && progressBar.style.width !== '100%') {
+                    progressBar.classList.add('bg-danger');
+                }
+            });
+
+            // Hide progress container after a delay
+            setTimeout(() => {
+                progressContainer.style.display = 'none';
+            }, 5000);
+        }
+    };
+
+    // Handle specific error events from server
+    evtSource.addEventListener('error', function(event) {
+        if (!errorOccurred) {
+            errorOccurred = true;
+            const data = JSON.parse(event.data);
+            showToast(`Generation Error: ${data.error}`, 'error');
+            evtSource.close();
+
+            // Update UI to show failure
+            components.forEach(component => {
+                const progressBar = document.querySelector(`#${component}Progress .progress-bar`);
+                if (progressBar && progressBar.style.width !== '100%') {
+                    progressBar.classList.add('bg-danger');
+                }
+            });
+
+            // If it was a timeout, suggest refresh
+            if (data.status === 'timeout') {
+                if (confirm('The process timed out. Would you like to refresh the page and try again?')) {
+                    location.reload();
+                }
+            }
+        }
+    });
+
+    // Set a timeout to close connection if it runs too long
+    setTimeout(() => {
+        if (!errorOccurred) {
+            evtSource.close();
+            showToast('Generation process timed out. Please refresh and try again.', 'warning');
+        }
+    }, 600000); // 10 minutes timeout
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    // Initialize flashcards
+    const flashcards = document.querySelectorAll('.flashcard');
+    flashcards.forEach(card => {
+        card.addEventListener('click', () => {
+            card.classList.toggle('flipped');
+        });
+    });
+
+    // Initialize tooltips
+    const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+    tooltipTriggerList.map(function(tooltipTriggerEl) {
+        return new bootstrap.Tooltip(tooltipTriggerEl);
+    });
+});
+</script>
+{% endblock %}

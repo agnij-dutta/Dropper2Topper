@@ -1,0 +1,215 @@
+{% extends "base.html" %}
+
+{% block title %}{{ 'Edit' if quiz else 'Create' }} Quiz{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="row justify-content-center">
+        <div class="col-md-10">
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item"><a href="{{ url_for('admin_dashboard') }}">Dashboard</a></li>
+                    <li class="breadcrumb-item active">{{ 'Edit' if quiz else 'Create' }} Quiz</li>
+                </ol>
+            </nav>
+
+            <div class="card shadow-sm fade-in">
+                <div class="card-header">
+                    <h3 class="mb-0">
+                        <i class="fas {% if quiz %}fa-edit{% else %}fa-plus{% endif %} me-2"></i>
+                        {{ 'Edit' if quiz else 'Create' }} Quiz
+                    </h3>
+                </div>
+                <div class="card-body">
+                    <form method="POST">
+                        <div class="mb-4">
+                            <label for="lecture" class="form-label">Lecture</label>
+                            <select class="form-select" id="lecture" name="lecture_id" required>
+                                <option value="">Select a lecture</option>
+                                {% for lecture in lectures %}
+                                <option value="{{ lecture.id }}" 
+                                        {% if quiz and quiz.lecture_id == lecture.id %}selected{% endif %}>
+                                    {{ lecture.subject.name }} - {{ lecture.title }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6 mb-4">
+                                <label for="date" class="form-label">Quiz Date & Time</label>
+                                <input type="datetime-local" class="form-control" id="date" name="date_of_quiz" 
+                                       value="{{ quiz.date_of_quiz.strftime('%Y-%m-%dT%H:%M') if quiz else '' }}" required>
+                            </div>
+                            <div class="col-md-6 mb-4">
+                                <label for="duration" class="form-label">Duration (minutes)</label>
+                                <input type="number" class="form-control" id="duration" name="time_duration" 
+                                       value="{{ quiz.time_duration if quiz else 30 }}" required min="1">
+                            </div>
+                        </div>
+                        <div class="mb-4">
+                            <label for="remarks" class="form-label">Remarks</label>
+                            <textarea class="form-control" id="remarks" name="remarks" rows="3" 
+                                    placeholder="Add any additional notes or instructions for students">{{ quiz.remarks if quiz else '' }}</textarea>
+                        </div>
+
+                        <div id="questionsContainer">
+                            <div class="d-flex justify-content-between align-items-center mb-4">
+                                <h4 class="mb-0">
+                                    <i class="fas fa-question-circle me-2"></i>Questions
+                                </h4>
+                                <button type="button" class="btn btn-primary" id="addQuestion">
+                                    <i class="fas fa-plus me-2"></i>Add Question
+                                </button>
+                            </div>
+                            {% if quiz %}
+                                {% for question in quiz.questions %}
+                                <div class="card mb-4 question-card">
+                                    <div class="card-body">
+                                        <div class="d-flex justify-content-between align-items-start mb-3">
+                                            <h5 class="mb-0">Question {{ loop.index }}</h5>
+                                            <button type="button" class="btn btn-outline-danger btn-sm remove-question">
+                                                <i class="fas fa-trash me-1"></i>Remove
+                                            </button>
+                                        </div>
+                                        <div class="mb-3">
+                                            <label class="form-label">Question Statement</label>
+                                            <textarea class="form-control" name="questions[{{ loop.index0 }}][statement]" 
+                                                    rows="2" required>{{ question.question_statement }}</textarea>
+                                        </div>
+                                        <div class="row">
+                                            <div class="col-md-6 mb-3">
+                                                <label class="form-label">Option 1</label>
+                                                <input type="text" class="form-control" name="questions[{{ loop.index0 }}][option1]" 
+                                                       value="{{ question.option1 }}" required>
+                                            </div>
+                                            <div class="col-md-6 mb-3">
+                                                <label class="form-label">Option 2</label>
+                                                <input type="text" class="form-control" name="questions[{{ loop.index0 }}][option2]" 
+                                                       value="{{ question.option2 }}" required>
+                                            </div>
+                                            <div class="col-md-6 mb-3">
+                                                <label class="form-label">Option 3</label>
+                                                <input type="text" class="form-control" name="questions[{{ loop.index0 }}][option3]" 
+                                                       value="{{ question.option3 }}" required>
+                                            </div>
+                                            <div class="col-md-6 mb-3">
+                                                <label class="form-label">Option 4</label>
+                                                <input type="text" class="form-control" name="questions[{{ loop.index0 }}][option4]" 
+                                                       value="{{ question.option4 }}" required>
+                                            </div>
+                                        </div>
+                                        <div class="mb-3">
+                                            <label class="form-label">Correct Option</label>
+                                            <select class="form-select" name="questions[{{ loop.index0 }}][correct_option]" required>
+                                                <option value="1" {% if question.correct_option == 1 %}selected{% endif %}>Option 1</option>
+                                                <option value="2" {% if question.correct_option == 2 %}selected{% endif %}>Option 2</option>
+                                                <option value="3" {% if question.correct_option == 3 %}selected{% endif %}>Option 3</option>
+                                                <option value="4" {% if question.correct_option == 4 %}selected{% endif %}>Option 4</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            {% endif %}
+                        </div>
+
+                        <div class="d-flex justify-content-end mt-4">
+                            <a href="{{ url_for('admin_dashboard') }}" class="btn btn-secondary me-2">Cancel</a>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-save me-2"></i>Save Quiz
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Question Template (Hidden) -->
+<template id="questionTemplate">
+    <div class="card mb-3 question-card">
+        <div class="card-body">
+            <div class="mb-3">
+                <label class="form-label">Question Statement</label>
+                <textarea class="form-control" name="questions[INDEX][statement]" required rows="2"></textarea>
+            </div>
+            <div class="row">
+                <div class="col-md-6 mb-2">
+                    <input type="text" class="form-control" name="questions[INDEX][option1]" placeholder="Option 1" required>
+                </div>
+                <div class="col-md-6 mb-2">
+                    <input type="text" class="form-control" name="questions[INDEX][option2]" placeholder="Option 2" required>
+                </div>
+                <div class="col-md-6 mb-2">
+                    <input type="text" class="form-control" name="questions[INDEX][option3]" placeholder="Option 3" required>
+                </div>
+                <div class="col-md-6 mb-2">
+                    <input type="text" class="form-control" name="questions[INDEX][option4]" placeholder="Option 4" required>
+                </div>
+            </div>
+            <div class="mb-2">
+                <label class="form-label">Correct Option</label>
+                <select class="form-select" name="questions[INDEX][correct_option]" required>
+                    <option value="1">Option 1</option>
+                    <option value="2">Option 2</option>
+                    <option value="3">Option 3</option>
+                    <option value="4">Option 4</option>
+                </select>
+            </div>
+            <button type="button" class="btn btn-danger btn-sm remove-question">Remove Question</button>
+        </div>
+    </div>
+</template>
+{% endblock %}
+
+{% block styles %}
+<style>
+    .question-card {
+        transition: all 0.3s ease;
+    }
+    .question-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    }
+</style>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const questionsContainer = document.getElementById('questionsContainer');
+        const addQuestionBtn = document.getElementById('addQuestion');
+        const questionTemplate = document.getElementById('questionTemplate');
+
+        function updateQuestionIndices() {
+            document.querySelectorAll('.question-card').forEach((card, index) => {
+                card.querySelectorAll('[name^="questions["]').forEach(input => {
+                    input.name = input.name.replace(/questions\[\d+\]/, `questions[${index}]`);
+                });
+            });
+        }
+
+        addQuestionBtn.addEventListener('click', function() {
+            const newQuestion = questionTemplate.content.cloneNode(true);
+            const index = document.querySelectorAll('.question-card').length;
+            newQuestion.querySelectorAll('[name*="INDEX"]').forEach(input => {
+                input.name = input.name.replace('INDEX', index);
+            });
+            questionsContainer.appendChild(newQuestion);
+        });
+
+        questionsContainer.addEventListener('click', function(e) {
+            if (e.target.classList.contains('remove-question')) {
+                e.target.closest('.question-card').remove();
+                updateQuestionIndices();
+            }
+        });
+
+        // Add at least one question if creating new quiz
+        if (document.querySelectorAll('.question-card').length === 0) {
+            addQuestionBtn.click();
+        }
+    });
+</script>
+{% endblock %}

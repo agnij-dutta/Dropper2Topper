@@ -1,0 +1,231 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - Student{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <!-- Statistics Cards -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card">
+                <div class="card-body text-center">
+                    <h5 class="card-title">Average Score</h5>
+                    <p class="card-text display-4">{{ "%.1f"|format(overall_stats.avg_score|default(0)) }}%</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card">
+                <div class="card-body text-center">
+                    <h5 class="card-title">Personal Best</h5>
+                    <p class="card-text display-4">{{ "%.1f"|format(overall_stats.personal_best|default(0)) }}%</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card">
+                <div class="card-body text-center">
+                    <h5 class="card-title">Total Questions</h5>
+                    <p class="card-text display-4">{{ overall_stats.total_questions|default(0) }}</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card">
+                <div class="card-body text-center">
+                    <h5 class="card-title">Current Rank</h5>
+                    <p class="card-text display-4">
+                        {% if ranking_info.rank != 'N/A' %}
+                            #{{ ranking_info.rank }}
+                        {% else %}
+                            --
+                        {% endif %}
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Content Area with Tabs -->
+    <div class="card">
+        <div class="card-header">
+            <ul class="nav nav-tabs card-header-tabs" role="tablist">
+                <li class="nav-item">
+                    <a class="nav-link active" data-bs-toggle="tab" href="#available-quizzes">
+                        <i class="fas fa-tasks me-2"></i>Available Quizzes
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" data-bs-toggle="tab" href="#recent-activity">
+                        <i class="fas fa-history me-2"></i>Recent Activity
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" data-bs-toggle="tab" href="#performance">
+                        <i class="fas fa-chart-bar me-2"></i>Performance
+                    </a>
+                </li>
+            </ul>
+        </div>
+        <div class="card-body">
+            <div class="tab-content">
+                <!-- Available Quizzes Tab -->
+                <div class="tab-pane fade show active" id="available-quizzes">
+                    <div class="table-responsive">
+                        <table class="table">
+                            <thead>
+                                <tr>
+                                    <th>Quiz Title</th>
+                                    <th>Subject</th>
+                                    <th>Date</th>
+                                    <th>Duration</th>
+                                    <th>Action</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% if available_quizzes %}
+                                    {% for quiz in available_quizzes %}
+                                    <tr>
+                                        <td>{{ quiz.lecture.title }}</td>
+                                        <td>{{ quiz.lecture.subject.name }}</td>
+                                        <td>{{ quiz.date_of_quiz.strftime('%Y-%m-%d %H:%M') }}</td>
+                                        <td>{{ quiz.time_duration }} minutes</td>
+                                        <td>
+                                            <a href="{{ url_for('start_quiz', quiz_id=quiz.id) }}" 
+                                               class="btn btn-sm btn-primary">
+                                                <i class="fas fa-play me-1"></i>Start Quiz
+                                            </a>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                {% else %}
+                                    <tr>
+                                        <td colspan="5" class="text-center">No quizzes available at the moment</td>
+                                    </tr>
+                                {% endif %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Recent Activity Tab -->
+                <div class="tab-pane fade" id="recent-activity">
+                    <div class="table-responsive">
+                        <table class="table">
+                            <thead>
+                                <tr>
+                                    <th>Quiz</th>
+                                    <th>Subject</th>
+                                    <th>Date</th>
+                                    <th>Score</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% if user_scores %}
+                                    {% for score in user_scores %}
+                                    <tr>
+                                        <td>{{ score.quiz.lecture.title }}</td>
+                                        <td>{{ score.quiz.lecture.subject.name }}</td>
+                                        <td>{{ score.time_stamp_of_attempt.strftime('%Y-%m-%d %H:%M') }}</td>
+                                        <td>{{ "%.1f"|format((score.total_scored/score.total_questions * 100)) }}%</td>
+                                        <td>
+                                            <span class="badge bg-{{ 'success' if (score.total_scored/score.total_questions) >= 0.7 else 'warning' if (score.total_scored/score.total_questions) >= 0.4 else 'danger' }}">
+                                                {{ "Pass" if (score.total_scored/score.total_questions) >= 0.7 else "Average" if (score.total_scored/score.total_questions) >= 0.4 else "Need Improvement" }}
+                                            </span>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                {% else %}
+                                    <tr>
+                                        <td colspan="5" class="text-center">No quiz attempts yet</td>
+                                    </tr>
+                                {% endif %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Performance Tab -->
+                <div class="tab-pane fade" id="performance">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="card h-100">
+                                <div class="card-header">
+                                    <h5 class="mb-0">Subject Performance</h5>
+                                </div>
+                                <div class="card-body">
+                                    {% if subject_performance %}
+                                        {% for subject in subject_performance %}
+                                        <div class="mb-4">
+                                            <div class="d-flex justify-content-between mb-2">
+                                                <h5 class="mb-0">{{ subject.subject.name }}</h5>
+                                                <small>{{ subject.total_attempts }} attempts</small>
+                                            </div>
+                                            <div class="progress" style="height: 20px;">
+                                                <div class="progress-bar bg-{{ 'success' if subject.avg_score >= 70 else 'warning' if subject.avg_score >= 40 else 'danger' }}" 
+                                                     role="progressbar" 
+                                                     style="width: {{ subject.avg_score|round|int }}%"
+                                                     aria-valuenow="{{ subject.avg_score|round|int }}"
+                                                     aria-valuemin="0"
+                                                     aria-valuemax="100">
+                                                    {{ "%.1f"|format(subject.avg_score) }}%
+                                                </div>
+                                            </div>
+                                            <small class="text-muted">Best: {{ "%.1f"|format(subject.best_score) }}%</small>
+                                        </div>
+                                        {% endfor %}
+                                    {% else %}
+                                        <p class="text-muted text-center">No subject performance data available</p>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="card h-100">
+                                <div class="card-header">
+                                    <h5 class="mb-0">Ranking Details</h5>
+                                </div>
+                                <div class="card-body text-center">
+                                    <div class="display-4 mb-2">
+                                        {% if ranking_info.rank != 'N/A' %}
+                                            #{{ ranking_info.rank }}
+                                        {% else %}
+                                            --
+                                        {% endif %}
+                                    </div>
+                                    <p class="text-muted">out of {{ ranking_info.total_students|default(0) }} students</p>
+                                    <div class="progress mb-2" style="height: 20px;">
+                                        <div class="progress-bar bg-success" 
+                                             role="progressbar" 
+                                             style="width: {{ ranking_info.percentile|default(0)|round|int }}%"
+                                             aria-valuenow="{{ ranking_info.percentile|default(0)|round|int }}"
+                                             aria-valuemin="0"
+                                             aria-valuemax="100">
+                                        </div>
+                                    </div>
+                                    <small class="text-muted">
+                                        You're in the top {{ "%.1f"|format(ranking_info.percentile|default(0)) }} percentile
+                                    </small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Initialize tooltips
+    const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+    tooltipTriggerList.map(function (tooltipTriggerEl) {
+        return new bootstrap.Tooltip(tooltipTriggerEl);
+    });
+});
+</script>
+{% endblock %}

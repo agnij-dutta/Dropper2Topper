@@ -1,0 +1,549 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h3 class="mb-0">
+                <i class="fas fa-{% if lecture %}edit{% else %}plus{% endif %}"></i>
+                {% if lecture %}Edit{% else %}Create{% endif %} Lecture
+            </h3>
+            <a href="{{ url_for('admin_dashboard') }}" class="btn btn-outline-secondary">
+                <i class="fas fa-times"></i> Cancel
+            </a>
+        </div>
+        <div class="card-body">
+            <form method="POST" id="lectureForm">
+                <div class="mb-3">
+                    <label for="subject_id" class="form-label">Subject</label>
+                    <select class="form-select" id="subject_id" name="subject_id" required>
+                        <option value="">Select a subject</option>
+                        {% for subject in subjects %}
+                        <option value="{{ subject.id }}" {% if lecture and lecture.subject_id == subject.id %}selected{% endif %}>
+                            {{ subject.name }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="mb-3">
+                    <label for="title" class="form-label">Title</label>
+                    <input type="text" class="form-control" id="title" name="title" required 
+                           value="{{ lecture.title if lecture else '' }}"
+                           placeholder="Enter lecture title">
+                </div>
+
+                <div class="mb-3">
+                    <label for="video_url" class="form-label">YouTube Video URL</label>
+                    <div class="form-text mb-2">
+                        <i class="fas fa-info-circle"></i> 
+                        The video transcript will be used to generate AI-powered study materials
+                    </div>
+                    <div class="input-group">
+                        <span class="input-group-text">
+                            <i class="fab fa-youtube"></i>
+                        </span>
+                        <input type="url" class="form-control" id="video_url" name="video_url" required
+                               placeholder="https://www.youtube.com/watch?v=..." 
+                               value="{{ lecture.video_url if lecture else '' }}">
+                    </div>
+                    <div class="form-text">
+                        Supported formats: YouTube watch URLs, share URLs, or embed URLs
+                    </div>
+                </div>
+
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" id="generate_ai_content" name="generate_ai_content" 
+                                   {% if not lecture %}checked{% endif %}>
+                            <label class="form-check-label" for="generate_ai_content">
+                                <h5 class="mb-0">
+                                    <i class="fas fa-robot"></i> AI Content Generation
+                                </h5>
+                            </label>
+                        </div>
+                    </div>
+                    <div class="card-body" id="aiOptions">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="form-check mb-3">
+                                    <input class="form-check-input" type="checkbox" id="generate_summary" name="generate_summary" checked>
+                                    <label class="form-check-label" for="generate_summary">
+                                        <i class="fas fa-file-alt"></i> Generate Summary
+                                        <small class="d-block text-muted">Creates a concise overview of key points</small>
+                                    </label>
+                                </div>
+                                
+                                <div class="form-check mb-3">
+                                    <input class="form-check-input" type="checkbox" id="generate_flashcards" name="generate_flashcards" checked>
+                                    <label class="form-check-label" for="generate_flashcards">
+                                        <i class="fas fa-clone"></i> Generate Flashcards
+                                        <small class="d-block text-muted">Creates interactive study cards</small>
+                                    </label>
+                                </div>
+                            </div>
+                            
+                            <div class="col-md-6">
+                                <div class="form-check mb-3">
+                                    <input class="form-check-input" type="checkbox" id="generate_notes" name="generate_notes" checked>
+                                    <label class="form-check-label" for="generate_notes">
+                                        <i class="fas fa-sticky-note"></i> Generate Study Notes
+                                        <small class="d-block text-muted">Creates detailed study materials</small>
+                                    </label>
+                                </div>
+                                
+                                <div class="form-check mb-3">
+                                    <input class="form-check-input" type="checkbox" id="generate_quiz" name="generate_quiz">
+                                    <label class="form-check-label" for="generate_quiz">
+                                        <i class="fas fa-question-circle"></i> Generate Quiz
+                                        <small class="d-block text-muted">Creates an assessment quiz</small>
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div id="quizOptions" class="mt-3 border-top pt-3" style="display: none;">
+                            <label for="num_questions" class="form-label">Number of Quiz Questions</label>
+                            <div class="input-group" style="max-width: 200px;">
+                                <button type="button" class="btn btn-outline-secondary" onclick="adjustQuestions(-5)">
+                                    <i class="fas fa-minus"></i>
+                                </button>
+                                <input type="number" class="form-control text-center" id="num_questions" name="num_questions" 
+                                       value="10" min="5" max="50" step="5">
+                                <button type="button" class="btn btn-outline-secondary" onclick="adjustQuestions(5)">
+                                    <i class="fas fa-plus"></i>
+                                </button>
+                            </div>
+                            <small class="form-text">Choose between 5 and 50 questions (in steps of 5)</small>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="text-end">
+                    <button type="submit" class="btn btn-primary btn-lg">
+                        <i class="fas fa-{% if lecture %}save{% else %}plus{% endif %}"></i>
+                        {% if lecture %}Update{% else %}Create{% endif %} Lecture
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Generation Progress Modal -->
+<div class="modal fade" id="generationModal" data-bs-backdrop="static" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fas fa-robot"></i> Generating AI Content
+                </h5>
+            </div>
+            <div class="modal-body">
+                <div class="overall-progress mb-4">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <h6 class="mb-0">Overall Progress</h6>
+                        <span class="progress-percentage">0%</span>
+                    </div>
+                    <div class="progress" style="height: 10px;">
+                        <div class="progress-bar progress-bar-striped progress-bar-animated" 
+                             role="progressbar" style="width: 0%"></div>
+                    </div>
+                </div>
+
+                <div class="generation-steps">
+                    <div class="progress-item mb-3" id="transcriptProgress">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <span><i class="fas fa-closed-captioning"></i> Video Transcript</span>
+                            <span class="progress-percentage">0%</span>
+                        </div>
+                        <div class="progress">
+                            <div class="progress-bar" role="progressbar" style="width: 0%"></div>
+                        </div>
+                    </div>
+                    <div class="progress-item mb-3" id="summaryProgress">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <span><i class="fas fa-file-alt"></i> Summary</span>
+                            <span class="progress-percentage">0%</span>
+                        </div>
+                        <div class="progress">
+                            <div class="progress-bar" role="progressbar" style="width: 0%"></div>
+                        </div>
+                    </div>
+                    
+                    <div class="progress-item mb-3" id="flashcardsProgress">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <span><i class="fas fa-clone"></i> Flashcards</span>
+                            <span class="progress-percentage">0%</span>
+                        </div>
+                        <div class="progress">
+                            <div class="progress-bar" role="progressbar" style="width: 0%"></div>
+                        </div>
+                    </div>
+                    
+                    <div class="progress-item mb-3" id="notesProgress">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <span><i class="fas fa-sticky-note"></i> Study Notes</span>
+                            <span class="progress-percentage">0%</span>
+                        </div>
+                        <div class="progress">
+                            <div class="progress-bar" role="progressbar" style="width: 0%"></div>
+                        </div>
+                    </div>
+                    
+                    <div class="progress-item mb-3" id="timestampsProgress">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <span><i class="fas fa-clock"></i> Video Timestamps</span>
+                            <span class="progress-percentage">0%</span>
+                        </div>
+                        <div class="progress">
+                            <div class="progress-bar" role="progressbar" style="width: 0%"></div>
+                        </div>
+                    </div>
+                    
+                    <div class="progress-item" id="quizProgress">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <span><i class="fas fa-question-circle"></i> Quiz</span>
+                            <span class="progress-percentage">0%</span>
+                        </div>
+                        <div class="progress">
+                            <div class="progress-bar" role="progressbar" style="width: 0%"></div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="text-center mt-4">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                    <p class="text-muted mt-2">Please wait while we generate your content...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block styles %}
+<style>
+.loading-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.9);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 9999;
+}
+
+.loading-content {
+    background: rgba(255, 255, 255, 0.1);
+    padding: 2rem;
+    border-radius: 1rem;
+    width: 90%;
+    max-width: 500px;
+}
+
+.progress-container {
+    width: 100%;
+}
+
+.progress-item {
+    margin-bottom: 1.5rem;
+}
+
+.progress-item:last-child {
+    margin-bottom: 0;
+}
+
+.progress {
+    height: 0.5rem;
+    background-color: rgba(255, 255, 255, 0.2);
+}
+
+.progress-bar {
+    background-color: #007bff;
+    transition: width 0.3s ease;
+}
+
+.progress-percentage {
+    color: white;
+    font-size: 0.875rem;
+}
+</style>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const PROGRESS_STEPS = {
+    transcript: {
+        id: 'transcriptProgress',
+        label: 'Video Transcript',
+        icon: 'fas fa-closed-captioning'
+    },
+    summary: {
+        id: 'summaryProgress',
+        label: 'Summary',
+        icon: 'fas fa-file-alt'
+    },
+    flashcards: {
+        id: 'flashcardsProgress',
+        label: 'Flashcards',
+        icon: 'fas fa-clone'
+    },
+    notes: {
+        id: 'notesProgress',
+        label: 'Study Notes',
+        icon: 'fas fa-sticky-note'
+    },
+    timestamps: {
+        id: 'timestampsProgress',
+        label: 'Video Timestamps',
+        icon: 'fas fa-clock'
+    },
+    quiz: {
+        id: 'quizProgress',
+        label: 'Quiz',
+        icon: 'fas fa-question-circle'
+    }
+};
+
+document.addEventListener('DOMContentLoaded', function() {
+    const generateAIContent = document.getElementById('generate_ai_content');
+    const aiOptions = document.getElementById('aiOptions');
+    const generateQuiz = document.getElementById('generate_quiz');
+    const quizOptions = document.getElementById('quizOptions');
+    const numQuestions = document.getElementById('num_questions');
+    const form = document.getElementById('lectureForm');
+    const modal = new bootstrap.Modal(document.getElementById('generationModal'));
+    let eventSource = null;
+    
+    // Toggle AI options visibility
+    generateAIContent.addEventListener('change', function() {
+        aiOptions.style.display = this.checked ? 'block' : 'none';
+    });
+    
+    // Toggle quiz options visibility
+    generateQuiz.addEventListener('change', function() {
+        quizOptions.style.display = this.checked ? 'block' : 'none';
+    });
+    
+    // Initialize visibility
+    aiOptions.style.display = generateAIContent.checked ? 'block' : 'none';
+    quizOptions.style.display = generateQuiz.checked ? 'block' : 'none';
+    
+    // Form validation and submission
+    form.addEventListener('submit', async function(event) {
+        event.preventDefault();
+        
+        if (!generateAIContent.checked) {
+            form.submit();
+            return;
+        }
+
+        const formData = new FormData(form);
+        const videoUrl = formData.get('video_url');
+        const subjectId = formData.get('subject_id');
+        const title = formData.get('title');
+        
+        if (!videoUrl || !subjectId || !title) {
+            showAlert('Please fill in all required fields', 'warning');
+            return;
+        }
+
+        if (generateQuiz.checked) {
+            const questions = parseInt(numQuestions.value);
+            if (questions < 5 || questions > 50) {
+                showAlert('Number of questions must be between 5 and 50', 'warning');
+                return;
+            }
+        }
+
+        try {
+            // Show processing modal
+            showProcessingModal();
+            
+            // First create the lecture and start AI processing
+            const response = await fetch('/admin/lecture/process', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    url: videoUrl,
+                    subject_id: subjectId,
+                    title: title,
+                    generate_summary: document.getElementById('generate_summary').checked,
+                    generate_flashcards: document.getElementById('generate_flashcards').checked,
+                    generate_notes: document.getElementById('generate_notes').checked,
+                    generate_quiz: generateQuiz.checked,
+                    num_questions: generateQuiz.checked ? parseInt(numQuestions.value) : 0
+                })
+            });
+
+            if (!response.ok) {
+                const data = await response.json();
+                throw new Error(data.error || 'Failed to process video');
+            }
+
+            const data = await response.json();
+            
+            // Connect to SSE endpoint for progress updates
+            if (eventSource) {
+                eventSource.close();
+            }
+
+            eventSource = new EventSource(`/lecture/${data.lecture_id}/generation-progress`);
+            let completedSteps = 0;
+            const totalSteps = getEnabledStepsCount();
+            
+            eventSource.onmessage = function(event) {
+                const progress = JSON.parse(event.data);
+                
+                if (progress.error) {
+                    eventSource.close();
+                    showAlert('Error: ' + progress.error, 'danger');
+                    hideProcessingModal();
+                    return;
+                }
+                
+                // Update specific progress bar
+                updateProgressBar(progress.component, progress.progress);
+                
+                // Check if this step is complete
+                if (progress.progress === 100) {
+                    completedSteps++;
+                    // Update overall progress
+                    const overallProgress = Math.round((completedSteps / totalSteps) * 100);
+                    updateOverallProgress(overallProgress);
+                    
+                    // If all steps are complete, redirect to the lecture page
+                    if (completedSteps === totalSteps) {
+                        setTimeout(() => {
+                            eventSource.close();
+                            window.location.href = `/lecture/${data.lecture_id}`;
+                        }, 1000);
+                    }
+                }
+            };
+            
+            eventSource.onerror = function(error) {
+                console.error('SSE Error:', error);
+                eventSource.close();
+                showAlert('Error receiving progress updates', 'danger');
+                hideProcessingModal();
+            };
+
+        } catch (error) {
+            console.error('Error:', error);
+            showAlert(error.message, 'danger');
+            hideProcessingModal();
+        }
+    });
+
+    function getEnabledStepsCount() {
+        let count = 1; // Transcript is always enabled
+        if (document.getElementById('generate_summary').checked) count++;
+        if (document.getElementById('generate_flashcards').checked) count++;
+        if (document.getElementById('generate_notes').checked) count++;
+        if (document.getElementById('generate_quiz').checked) count++;
+        return count;
+    }
+
+    function showProcessingModal() {
+        // Reset all progress bars
+        Object.values(PROGRESS_STEPS).forEach(step => {
+            const progressElement = document.getElementById(step.id);
+            if (progressElement) {
+                const progressBar = progressElement.querySelector('.progress-bar');
+                const percentage = progressElement.querySelector('.progress-percentage');
+                progressBar.style.width = '0%';
+                progressBar.classList.remove('bg-success');
+                percentage.textContent = '0%';
+            }
+        });
+
+        // Show only relevant progress items
+        document.getElementById('transcriptProgress').style.display = 'block'; // Always show transcript
+        document.getElementById('summaryProgress').style.display = 
+            document.getElementById('generate_summary').checked ? 'block' : 'none';
+        document.getElementById('flashcardsProgress').style.display = 
+            document.getElementById('generate_flashcards').checked ? 'block' : 'none';
+        document.getElementById('notesProgress').style.display = 
+            document.getElementById('generate_notes').checked ? 'block' : 'none';
+        document.getElementById('quizProgress').style.display = 
+            document.getElementById('generate_quiz').checked ? 'block' : 'none';
+        
+        modal.show();
+    }
+
+    function hideProcessingModal() {
+        if (eventSource) {
+            eventSource.close();
+        }
+        modal.hide();
+    }
+
+    function updateProgressBar(component, progress) {
+        const stepConfig = PROGRESS_STEPS[component];
+        if (!stepConfig) return;
+
+        const progressElement = document.getElementById(stepConfig.id);
+        if (!progressElement) return;
+
+        const progressBar = progressElement.querySelector('.progress-bar');
+        const percentage = progressElement.querySelector('.progress-percentage');
+        
+        progressBar.style.width = `${progress}%`;
+        percentage.textContent = `${progress}%`;
+        
+        if (progress === 100) {
+            progressBar.classList.add('bg-success');
+        }
+    }
+
+    function updateOverallProgress(progress) {
+        const overallElement = document.getElementById('overallProgress');
+        if (!overallElement) return;
+
+        const progressBar = overallElement.querySelector('.progress-bar');
+        const percentage = overallElement.querySelector('.progress-percentage');
+        
+        progressBar.style.width = `${progress}%`;
+        percentage.textContent = `${progress}%`;
+        
+        if (progress === 100) {
+            progressBar.classList.add('bg-success');
+        }
+    }
+
+    function showAlert(message, type = 'info') {
+        const alertContainer = document.getElementById('alertContainer');
+        const alert = document.createElement('div');
+        alert.className = `alert alert-${type} alert-dismissible fade show`;
+        alert.innerHTML = `
+            ${message}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        `;
+        alertContainer.appendChild(alert);
+        
+        // Auto-dismiss after 5 seconds
+        setTimeout(() => {
+            alert.classList.remove('show');
+            setTimeout(() => alert.remove(), 150);
+        }, 5000);
+    }
+
+    function adjustQuestions(amount) {
+        const input = document.getElementById('num_questions');
+        let value = parseInt(input.value) + amount;
+        value = Math.min(Math.max(5, value), 50);
+        input.value = value;
+    }
+});
+</script>
+{% endblock %}

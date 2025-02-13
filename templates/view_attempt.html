@@ -1,0 +1,152 @@
+{% extends "base.html" %}
+{% block title %}Quiz Attempt Review{% endblock %}
+{% block content %}
+<div class="container my-4">
+    <div class="row">
+        <div class="col-md-4">
+            <div class="card mb-4">
+                <div class="card-header bg-primary text-white">
+                    <h4 class="mb-0">Score Summary</h4>
+                </div>
+                <div class="card-body">
+                    <div class="display-4 text-center mb-3">
+                        {{ (score.total_scored / score.total_questions * 100)|round(1) }}%
+                    </div>
+                    <div class="text-center mb-3">
+                        <strong>{{ score.total_scored }} / {{ score.total_questions }}</strong> correct
+                    </div>
+                    <hr>
+                    <div class="small text-muted">
+                        <p><i class="fas fa-clock"></i> Time taken: {{ score.time_taken }} minutes</p>
+                        <p><i class="fas fa-calendar"></i> Attempted on: {{ score.time_stamp_of_attempt.strftime('%Y-%m-%d %H:%M:%S') }}</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">Quiz Details</h5>
+                </div>
+                <div class="card-body">
+                    <p><strong>Subject:</strong> {{ score.quiz.lecture.subject.name }}</p>
+                    <p><strong>Lecture:</strong> {{ score.quiz.lecture.title }}</p>
+                    <p><strong>Duration:</strong> {{ score.quiz.time_duration }} minutes</p>
+                    {% if score.quiz.remarks %}
+                    <p><strong>Remarks:</strong> {{ score.quiz.remarks }}</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header">
+                    <h4 class="mb-0">Question Review</h4>
+                </div>
+                <div class="card-body">
+                    {% for question in questions %}
+                    {% set feedback_item = feedback[loop.index0] if feedback else None %}
+                    <div class="question-review mb-4 p-3 {% if feedback_item and feedback_item.is_correct %}bg-success-light{% else %}bg-danger-light{% endif %}">
+                        <h5 class="mb-3">
+                            Question {{ loop.index }}
+                            {% if feedback_item and feedback_item.is_correct %}
+                            <span class="badge bg-success"><i class="fas fa-check"></i> Correct</span>
+                            {% else %}
+                            <span class="badge bg-danger"><i class="fas fa-times"></i> Incorrect</span>
+                            {% endif %}
+                        </h5>
+                        
+                        <p class="mb-3">{{ question.statement }}</p>
+                        
+                        <div class="options-list">
+                            {% for option in question.options %}
+                            <div class="option mb-2 p-2 rounded {% if loop.index == feedback_item.correct_answer %}correct-answer{% endif %} {% if loop.index == feedback_item.submitted_answer and not feedback_item.is_correct %}wrong-answer{% endif %}">
+                                <span class="option-letter">{{ chr(64 + loop.index) }}.</span>
+                                {{ option }}
+                                {% if loop.index == feedback_item.correct_answer %}
+                                <i class="fas fa-check text-success"></i>
+                                {% endif %}
+                                {% if loop.index == feedback_item.submitted_answer and not feedback_item.is_correct %}
+                                <i class="fas fa-times text-danger"></i>
+                                {% endif %}
+                            </div>
+                            {% endfor %}
+                        </div>
+                        
+                        {% if feedback_item and not feedback_item.is_correct %}
+                        <div class="explanation mt-3 p-3 bg-light border rounded">
+                            <i class="fas fa-info-circle text-primary"></i>
+                            {{ feedback_item.explanation }}
+                        </div>
+                        {% endif %}
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="text-center mt-4">
+        <a href="{{ url_for('user_dashboard') }}" class="btn btn-primary">
+            <i class="fas fa-arrow-left"></i> Back to Dashboard
+        </a>
+        {% if score.quiz.lecture %}
+        <a href="{{ url_for('view_lecture', lecture_id=score.quiz.lecture.id) }}" class="btn btn-outline-primary">
+            <i class="fas fa-video"></i> Review Lecture
+        </a>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+
+{% block styles %}
+<style>
+.bg-success-light {
+    background-color: rgba(40, 167, 69, 0.1);
+    border: 1px solid rgba(40, 167, 69, 0.2);
+    border-radius: 0.25rem;
+}
+
+.bg-danger-light {
+    background-color: rgba(220, 53, 69, 0.1);
+    border: 1px solid rgba(220, 53, 69, 0.2);
+    border-radius: 0.25rem;
+}
+
+.options-list .option {
+    border: 1px solid #dee2e6;
+    transition: all 0.2s;
+}
+
+.options-list .option:hover {
+    background-color: rgba(0,0,0,0.05);
+}
+
+.options-list .option.correct-answer {
+    background-color: rgba(40, 167, 69, 0.1);
+    border-color: rgba(40, 167, 69, 0.2);
+}
+
+.options-list .option.wrong-answer {
+    background-color: rgba(220, 53, 69, 0.1);
+    border-color: rgba(220, 53, 69, 0.2);
+}
+
+.option-letter {
+    display: inline-block;
+    width: 25px;
+    height: 25px;
+    line-height: 25px;
+    text-align: center;
+    border-radius: 50%;
+    background-color: #f8f9fa;
+    margin-right: 10px;
+    font-weight: bold;
+}
+
+.explanation {
+    font-size: 0.9rem;
+    color: #6c757d;
+}
+</style>
+{% endblock %}
