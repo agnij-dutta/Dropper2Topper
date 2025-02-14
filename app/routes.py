@@ -497,8 +497,8 @@ def user_dashboard():
     # Get user's quiz attempts
     user_scores = Score.query.filter_by(user_id=current_user.id).order_by(Score.time_stamp_of_attempt.desc()).all()
     
-    # Get all subjects for the lectures tab
-    subjects = Subject.query.all()
+    # Get all subjects with their lectures
+    subjects = Subject.query.order_by(Subject.name).all()
     
     # Calculate overall statistics
     total_attempts = len(user_scores)
@@ -536,9 +536,9 @@ def user_dashboard():
     all_students = User.query.all()
     rankings = []
     for student in all_students:
-        student_scores = Score.query.filter_by(user_id=student.id).all()
-        if student_scores:
-            student_avg = sum(s.total_scored * 100.0 / s.total_questions for s in student_scores) / len(student_scores)
+        scores = Score.query.filter_by(user_id=student.id).all()
+        if scores:
+            student_avg = sum(s.total_scored * 100.0 / s.total_questions for s in scores) / len(scores)
             rankings.append((student.id, student_avg))
     
     # Sort by average score
@@ -565,7 +565,6 @@ def user_dashboard():
     
     # Calculate subject-wise performance
     subject_performance = []
-    
     for subject in subjects:
         # Get all quizzes for this subject
         subject_quizzes = Quiz.query.join(Lecture).filter(Lecture.subject_id == subject.id).all()
@@ -584,8 +583,9 @@ def user_dashboard():
                     'best_score': subject_best,
                     'total_attempts': total_subject_attempts
                 })
-    
+
     return render_template('user_dashboard.html',
+                         subjects=subjects,  # Added subjects for lectures
                          available_quizzes=available_quizzes,
                          user_scores=user_scores,
                          total_attempts=total_attempts,
@@ -1395,3 +1395,8 @@ def process_video():
     except Exception as e:
         print(f"[ERROR] An error occurred: {str(e)}")
         return jsonify({'error': str(e)}), 500
+
+@app.template_filter('to_letter')
+def to_letter(number):
+    """Convert a number to corresponding uppercase letter (1=A, 2=B, etc.)"""
+    return chr(64 + number)

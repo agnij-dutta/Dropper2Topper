@@ -1,39 +1,30 @@
 {% extends "base.html" %}
 {% block title %}Quiz Attempt Review{% endblock %}
 {% block content %}
-<div class="container my-4">
+<div class="container mt-4">
     <div class="row">
         <div class="col-md-4">
-            <div class="card mb-4">
-                <div class="card-header bg-primary text-white">
-                    <h4 class="mb-0">Score Summary</h4>
-                </div>
-                <div class="card-body">
-                    <div class="display-4 text-center mb-3">
-                        {{ (score.total_scored / score.total_questions * 100)|round(1) }}%
-                    </div>
-                    <div class="text-center mb-3">
-                        <strong>{{ score.total_scored }} / {{ score.total_questions }}</strong> correct
-                    </div>
-                    <hr>
-                    <div class="small text-muted">
-                        <p><i class="fas fa-clock"></i> Time taken: {{ score.time_taken }} minutes</p>
-                        <p><i class="fas fa-calendar"></i> Attempted on: {{ score.time_stamp_of_attempt.strftime('%Y-%m-%d %H:%M:%S') }}</p>
-                    </div>
-                </div>
-            </div>
-
             <div class="card">
                 <div class="card-header">
-                    <h5 class="mb-0">Quiz Details</h5>
+                    <h5 class="mb-0">Quiz Results</h5>
                 </div>
                 <div class="card-body">
-                    <p><strong>Subject:</strong> {{ score.quiz.lecture.subject.name }}</p>
-                    <p><strong>Lecture:</strong> {{ score.quiz.lecture.title }}</p>
-                    <p><strong>Duration:</strong> {{ score.quiz.time_duration }} minutes</p>
-                    {% if score.quiz.remarks %}
-                    <p><strong>Remarks:</strong> {{ score.quiz.remarks }}</p>
-                    {% endif %}
+                    <div class="text-center mb-4">
+                        <div class="display-4 fw-bold text-{{ 'success' if (score.total_scored/score.total_questions >= 0.7) else 'warning' if (score.total_scored/score.total_questions >= 0.4) else 'danger' }}">
+                            {{ "%.1f"|format((score.total_scored/score.total_questions * 100)) }}%
+                        </div>
+                        <h6>Questions Answered Correctly:</h6>
+                        <span>{{ score.total_scored }} / {{ score.total_questions }}</span>
+                    </div>
+                    <div class="mb-3">
+                        <p><strong>Subject:</strong> {{ score.quiz.lecture.subject.name }}</p>
+                        <p><strong>Lecture:</strong> {{ score.quiz.lecture.title }}</p>
+                        <p><strong>Duration:</strong> {{ score.quiz.time_duration }} minutes</p>
+                        <p><strong>Time Taken:</strong> {{ score.time_taken }} minutes</p>
+                        {% if score.quiz.remarks %}
+                        <p><strong>Remarks:</strong> {{ score.quiz.remarks }}</p>
+                        {% endif %}
+                    </div>
                 </div>
             </div>
         </div>
@@ -46,24 +37,16 @@
                 <div class="card-body">
                     {% for question in questions %}
                     {% set feedback_item = feedback[loop.index0] if feedback else None %}
-                    <div class="question-review mb-4 p-3 {% if feedback_item and feedback_item.is_correct %}bg-success-light{% else %}bg-danger-light{% endif %}">
-                        <h5 class="mb-3">
-                            Question {{ loop.index }}
-                            {% if feedback_item and feedback_item.is_correct %}
-                            <span class="badge bg-success"><i class="fas fa-check"></i> Correct</span>
-                            {% else %}
-                            <span class="badge bg-danger"><i class="fas fa-times"></i> Incorrect</span>
-                            {% endif %}
-                        </h5>
-                        
+                    <div class="question-review mb-4 p-3 {{ 'bg-success-light' if feedback_item and feedback_item.is_correct else 'bg-danger-light' if feedback_item else '' }}">
+                        <h5 class="mb-3">Question {{ loop.index }}</h5>
                         <p class="mb-3">{{ question.statement }}</p>
                         
                         <div class="options-list">
                             {% for option in question.options %}
-                            <div class="option mb-2 p-2 rounded {% if loop.index == feedback_item.correct_answer %}correct-answer{% endif %} {% if loop.index == feedback_item.submitted_answer and not feedback_item.is_correct %}wrong-answer{% endif %}">
-                                <span class="option-letter">{{ chr(64 + loop.index) }}.</span>
+                            <div class="option p-2 mb-2 {{ 'bg-success-light' if feedback_item and loop.index == question.correct_option }}">
+                                <span class="option-letter">{{ loop.index|to_letter }}.</span>
                                 {{ option }}
-                                {% if loop.index == feedback_item.correct_answer %}
+                                {% if feedback_item and loop.index == question.correct_option %}
                                 <i class="fas fa-check text-success"></i>
                                 {% endif %}
                                 {% if loop.index == feedback_item.submitted_answer and not feedback_item.is_correct %}
@@ -134,19 +117,13 @@
 
 .option-letter {
     display: inline-block;
-    width: 25px;
-    height: 25px;
-    line-height: 25px;
-    text-align: center;
-    border-radius: 50%;
-    background-color: #f8f9fa;
-    margin-right: 10px;
+    min-width: 25px;
     font-weight: bold;
 }
 
 .explanation {
     font-size: 0.9rem;
-    color: #6c757d;
+    color: #666;
 }
 </style>
 {% endblock %}
