@@ -14,7 +14,7 @@ class FlashcardService:
         if not self.api_key:
             raise ValueError("GOOGLE_API_KEY environment variable is not set")
         genai.configure(api_key=self.api_key)
-        self.model = genai.GenerativeModel('gemini-pro')
+        self.model = genai.GenerativeModel('gemini-2.0-flash')
         self.min_content_length = 20
         self.max_retries = 2
 

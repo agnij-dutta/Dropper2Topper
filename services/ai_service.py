@@ -15,7 +15,7 @@ class LectureAIService:
         if not self.api_key:
             raise ValueError("GOOGLE_API_KEY environment variable is not set")
         genai.configure(api_key=self.api_key)
-        self.model = genai.GenerativeModel('gemini-pro')
+        self.model = genai.GenerativeModel('gemini-2.0-flash')
         self.video_service = VideoService()
         self._error_counts = {
             'quiz': 0,

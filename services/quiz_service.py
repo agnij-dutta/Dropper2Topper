@@ -11,7 +11,7 @@ class QuizService:
         if not self.api_key:
             raise ValueError("GOOGLE_API_KEY environment variable is not set")
         genai.configure(api_key=self.api_key)
-        self.model = genai.GenerativeModel('gemini-pro')
+        self.model = genai.GenerativeModel('gemini-2.0-flash')
         self.ai_service = ai_service
 
     def generate_quiz(self, content: str, num_questions: int = 10) -> dict:
